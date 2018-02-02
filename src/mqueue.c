@@ -103,10 +103,11 @@ _init_state(PyObject *module)
 /* MQ */
 typedef struct {
     PyObject_HEAD
-    struct mq_attr attr;
     PyObject *name;
     PyObject *bytes;
     char *msg;
+    Py_ssize_t msgsize;
+    Py_ssize_t maxmsg;
     mode_t mode;
     int flags;
     mqd_t mqd;
@@ -170,13 +171,20 @@ _MQ_New(MQ *self, PyObject *args, PyObject *kwargs)
     }
 
     filename = PyBytes_AS_STRING(self->bytes);
-    if (((self->mqd = mq_open(filename, self->flags, self->mode, &attr)) == -1) ||
-        mq_getattr(self->mqd, &self->attr)) {
+    if (((self->mqd = mq_open(filename, self->flags, self->mode, &attr)) == -1)) {
         _PyErr_SetFromErrnoWithFilename(filename);
         return -1;
     }
 
-    if (!(self->msg = PyObject_Malloc(self->attr.mq_msgsize))) {
+    memset(&attr, 0, sizeof(struct mq_attr));
+    if (mq_getattr(self->mqd, &attr)) {
+        _PyErr_SetFromErrnoWithFilename(filename);
+        return -1;
+    }
+    self->maxmsg = attr.mq_maxmsg;
+    self->msgsize = attr.mq_msgsize;
+
+    if (!(self->msg = PyObject_Malloc(self->msgsize))) {
         PyErr_NoMemory();
         return -1;
     }
@@ -191,6 +199,8 @@ _MQ_Alloc(PyTypeObject *type)
     MQ *self = NULL;
 
     if ((self = __PyObject_Alloc(MQ, type))) {
+        self->msgsize = -1;
+        self->maxmsg = -1;
         self->mode = S_IRUSR | S_IWUSR; // ReadWrite by owner;
         self->mqd = -1;
         PyObject_GC_Track(self);
@@ -265,9 +275,9 @@ static PyObject *
 MQ_tp_repr(MQ *self)
 {
     return PyUnicode_FromFormat(
-        "<%s('%U', %d, mode=%u, maxmsg=%ld, msgsize=%ld)>",
+        "<%s('%U', %d, mode=%u, maxmsg=%zd, msgsize=%zd)>",
         Py_TYPE(self)->tp_name, self->name, self->flags, self->mode,
-        self->attr.mq_maxmsg, self->attr.mq_msgsize);
+        self->maxmsg, self->msgsize);
 }
 
 
@@ -306,13 +316,13 @@ static PyObject *
 MQ_send(MQ *self, PyObject *args)
 {
     Py_buffer msg;
-    Py_ssize_t size, msgsize = self->attr.mq_msgsize;
+    Py_ssize_t size = 0;
     int res = -1;
 
     if (!PyArg_ParseTuple(args, "y*:send", &msg)) {
         return NULL;
     }
-    size = Py_MIN(msg.len, msgsize);
+    size = Py_MIN(msg.len, self->msgsize);
     res = mq_send(self->mqd, msg.buf, size, 0);
     PyBuffer_Release(&msg);
     return res ? _PyErr_SetFromErrno() : PyLong_FromSsize_t(size);
@@ -327,9 +337,9 @@ Receive 1 message.");
 static PyObject *
 MQ_recv(MQ *self)
 {
-    Py_ssize_t rcvd, msgsize = self->attr.mq_msgsize;
+    Py_ssize_t rcvd = -1;
 
-    if ((rcvd = mq_receive(self->mqd, self->msg, msgsize, NULL)) < 0) {
+    if ((rcvd = mq_receive(self->mqd, self->msg, self->msgsize, NULL)) < 0) {
         return _PyErr_SetFromErrno();
     }
     return PyBytes_FromStringAndSize(self->msg, rcvd);
@@ -344,14 +354,14 @@ Fill the queue with messages from buf.");
 static PyObject *
 MQ__fill(MQ *self, PyObject *args)
 {
-    Py_ssize_t size, bufsize, msgsize = self->attr.mq_msgsize;
-    PyByteArrayObject *buf;
+    Py_ssize_t size = 0, bufsize = 0;
+    PyByteArrayObject *buf = NULL;
 
     if (!PyArg_ParseTuple(args, "Y:_fill", &buf)) {
         return NULL;
     }
     while ((bufsize = Py_SIZE(buf))) {
-        size = Py_MIN(bufsize, msgsize);
+        size = Py_MIN(bufsize, self->msgsize);
         if (mq_send(self->mqd, PyByteArray_AS_STRING(buf), size, 0)) {
             return _PyErr_SetFromErrno();
         }
@@ -371,10 +381,10 @@ Drain all messages from the queue into buf.");
 static PyObject *
 MQ__drain(MQ *self, PyObject *args)
 {
-    Py_ssize_t rcvd = 0, msgsize = self->attr.mq_msgsize;
-    PyByteArrayObject *buf;
+    Py_ssize_t rcvd = -1;
+    PyByteArrayObject *buf = NULL;
     struct mq_attr attr = { 0 };
-    long i, mq_len;
+    long i, mq_len = 0;
 
     if (!PyArg_ParseTuple(args, "Y:_drain", &buf)) {
         return NULL;
@@ -384,17 +394,17 @@ MQ__drain(MQ *self, PyObject *args)
     }
     mq_len = attr.mq_curmsgs ? attr.mq_curmsgs : 1;
     for (i = 0; i < mq_len; ++i) {
-        if ((rcvd = mq_receive(self->mqd, self->msg, msgsize, NULL)) < 0) {
+        if ((rcvd = mq_receive(self->mqd, self->msg, self->msgsize, NULL)) < 0) {
             return _PyErr_SetFromErrno();
         }
         if (!rcvd) {
             break;
         }
-        if (__PyByteArray_Grow(buf, rcvd, self->msg, msgsize)) {
+        if (__PyByteArray_Grow(buf, rcvd, self->msg, self->msgsize)) {
             return NULL;
         }
     }
-    return PyBool_FromLong(!rcvd);
+    return PyBool_FromLong((rcvd == 0));
 }
 
 
@@ -415,8 +425,8 @@ static PyMemberDef MQ_tp_members[] = {
     {"name", T_OBJECT_EX, offsetof(MQ, name), READONLY, NULL},
     {"flags", T_INT, offsetof(MQ, flags), READONLY, NULL},
     {"mode", T_UINT, offsetof(MQ, mode), READONLY, NULL},
-    {"maxmsg", T_LONG, offsetof(MQ, attr.mq_maxmsg), READONLY, NULL},
-    {"msgsize", T_LONG, offsetof(MQ, attr.mq_msgsize), READONLY, NULL},
+    {"maxmsg", T_PYSSIZET, offsetof(MQ, maxmsg), READONLY, NULL},
+    {"msgsize", T_PYSSIZET, offsetof(MQ, msgsize), READONLY, NULL},
     {NULL}  /* Sentinel */
 };
 
