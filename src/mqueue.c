@@ -106,6 +106,7 @@ typedef struct {
     PyObject *name;
     PyObject *bytes;
     char *msg;
+    int owner;
     Py_ssize_t msgsize;
     Py_ssize_t maxmsg;
     mode_t mode;
@@ -121,8 +122,10 @@ _MQ_Close(MQ *self)
     char *filename = PyBytes_AS_STRING(self->bytes);
 
     if (self->mqd != -1) {
-        if ((res = mq_close(self->mqd)) ||
-            ((self->flags & O_CREAT) && (res = mq_unlink(filename)))) {
+        if ((res = mq_close(self->mqd))) {
+            _PyErr_SetFromErrno();
+        }
+        else if (self->owner && (res = mq_unlink(filename))) {
             _PyErr_SetFromErrnoWithFilename(filename);
         }
         self->mqd = -1;
@@ -171,14 +174,40 @@ _MQ_New(MQ *self, PyObject *args, PyObject *kwargs)
     }
 
     filename = PyBytes_AS_STRING(self->bytes);
-    if (((self->mqd = mq_open(filename, self->flags, self->mode, &attr)) == -1)) {
-        _PyErr_SetFromErrnoWithFilename(filename);
+    if ((self->flags & O_CREAT)) {
+        int flags = self->flags | O_EXCL;
+        int saved_errno = errno;
+        if (((self->mqd = mq_open(filename, flags, self->mode, &attr)) == -1)) {
+            if ((flags != self->flags) && (errno == EEXIST)) {
+                errno = saved_errno;
+                self->mqd = mq_open(filename, self->flags, self->mode, &attr);
+            }
+        }
+        else {
+            self->owner = 1;
+        }
+    }
+    else {
+        self->mqd = mq_open(filename, self->flags, self->mode, &attr);
+    }
+    if (self->mqd == -1) {
+        switch (errno) {
+            case EACCES:
+            case EEXIST:
+            case ENAMETOOLONG:
+            case ENOENT:
+                _PyErr_SetFromErrnoWithFilename(filename);
+                break;
+            default:
+                _PyErr_SetFromErrno();
+                break;
+        }
         return -1;
     }
 
     memset(&attr, 0, sizeof(struct mq_attr));
     if (mq_getattr(self->mqd, &attr)) {
-        _PyErr_SetFromErrnoWithFilename(filename);
+        _PyErr_SetFromErrno();
         return -1;
     }
     self->maxmsg = attr.mq_maxmsg;
@@ -202,6 +231,7 @@ _MQ_Alloc(PyTypeObject *type)
         self->msgsize = -1;
         self->maxmsg = -1;
         self->mode = S_IRUSR | S_IWUSR; // ReadWrite by owner;
+        self->owner = 0;
         self->mqd = -1;
         PyObject_GC_Track(self);
     }
