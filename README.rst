@@ -12,9 +12,12 @@ POSIX message queues allow processes to exchange data in the form of messages.
 -----
 
 
-MessageQueue(name, flags[, mode=\ stat.S_IRUSR_ | stat.S_IWUSR_, maxmsg=-1, msgsize=-1])
+MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
     * name (str)
-        Must start with '/'.
+        Each message queue is identified by a *name* of the form ``/somename``;
+        that is, a string consisting of an initial slash, followed by one or
+        more characters, none of which are slashes. Two processes can operate on
+        the same queue by passing the same *name*.
 
     * flags (int)
         Exactly one of the following must be specified in *flags*:
@@ -42,11 +45,28 @@ MessageQueue(name, flags[, mode=\ stat.S_IRUSR_ | stat.S_IWUSR_, maxmsg=-1, msgs
             If os.O_CREAT_ was specified in *flags*, and a queue with the given
             *name* already exists, then raise FileExistsError_.
 
-        If os.O_CREAT_ is specified in *flags*, then three additional arguments
-        can be supplied:
+        If os.O_CREAT_ is specified in *flags*, then three additional optional
+        arguments can be supplied:
 
-        * mode (int: stat.S_IRUSR_ | stat.S_IWUSR_)
-            TODO.
+        * mode (int: 0o600)
+            The *mode* argument specifies the permissions to be placed on the
+            new queue. The permissions settings are masked against the process
+            umask.
+            *mode* may take one of the following values or bitwise ORed
+            combinations of them:
+
+            * stat.S_IRWXU_
+            * stat.S_IRUSR_
+            * stat.S_IWUSR_
+            * stat.S_IXUSR_
+            * stat.S_IRWXG_
+            * stat.S_IRGRP_
+            * stat.S_IWGRP_
+            * stat.S_IXGRP_
+            * stat.S_IRWXO_
+            * stat.S_IROTH_
+            * stat.S_IWOTH_
+            * stat.S_IXOTH_
 
         * maxmsg (int: -1)
             TODO.
@@ -55,27 +75,26 @@ MessageQueue(name, flags[, mode=\ stat.S_IRUSR_ | stat.S_IWUSR_, maxmsg=-1, msgs
             TODO.
 
 
+    .. _close():
+
     close()
-        TODO.
+        Closes the message queue.
 
 
     fileno() -> int
-        TODO.
+        Returns the underlying file descriptor of the message queue.
 
 
     .. _send():
 
     send(message) -> int
-        * message (`bytes-like object`_)
-            TODO.
-
-        TODO.
+        Sends one bytes-like_ *message*. Returns the number of bytes sent.
 
 
     .. _recv():
 
     recv() -> bytes
-        TODO.
+        Receives and returns one message.
 
 
     name
@@ -111,20 +130,31 @@ MessageQueue(name, flags[, mode=\ stat.S_IRUSR_ | stat.S_IWUSR_, maxmsg=-1, msgs
     closed
         *read only*
 
-        TODO.
+        ``True`` if the message queue is closed (i.e. `close()`_ has been
+        called). ``False`` otherwise.
 
 
-.. _bytes-like object: https://docs.python.org/3.5/glossary.html#term-bytes-like-object
+.. _bytes-like: https://docs.python.org/3.5/glossary.html#term-bytes-like-object
 .. _os.O_RDONLY: https://docs.python.org/3.5/library/os.html#os.O_RDONLY
 .. _os.O_WRONLY: https://docs.python.org/3.5/library/os.html#os.O_WRONLY
 .. _os.O_RDWR: https://docs.python.org/3.5/library/os.html#os.O_RDWR
 .. _os.O_NONBLOCK: https://docs.python.org/3.5/library/os.html#os.O_NONBLOCK
 .. _os.O_CREAT: https://docs.python.org/3.5/library/os.html#os.O_CREAT
 .. _os.O_EXCL: https://docs.python.org/3.5/library/os.html#os.O_EXCL
-.. _stat.S_IRUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IRUSR
-.. _stat.S_IWUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IWUSR
 .. _errno.EAGAIN: https://docs.python.org/3.5/library/errno.html#errno.EAGAIN
 .. _errno.EEXIST: https://docs.python.org/3.5/library/errno.html#errno.EEXIST
 .. _BlockingIOError: https://docs.python.org/3.5/library/exceptions.html#BlockingIOError
 .. _FileExistsError: https://docs.python.org/3.5/library/exceptions.html#FileExistsError
+.. _stat.S_IRWXU: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXU
+.. _stat.S_IRUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IRUSR
+.. _stat.S_IWUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IWUSR
+.. _stat.S_IXUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IXUSR
+.. _stat.S_IRWXG: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXG
+.. _stat.S_IRGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IRGRP
+.. _stat.S_IWGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IWGRP
+.. _stat.S_IXGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IXGRP
+.. _stat.S_IRWXO: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXO
+.. _stat.S_IROTH: https://docs.python.org/3.5/library/stat.html#stat.S_IROTH
+.. _stat.S_IWOTH: https://docs.python.org/3.5/library/stat.html#stat.S_IWOTH
+.. _stat.S_IXOTH: https://docs.python.org/3.5/library/stat.html#stat.S_IXOTH
 

@@ -245,8 +245,7 @@ _MQ_Alloc(PyTypeObject *type)
 
 /* MQType.tp_doc */
 PyDoc_STRVAR(MQ_tp_doc,
-"MessageQueue(name, flags[, mode=stat.S_IRUSR | stat.S_IWUSR, "
-              "maxmsg=-1, msgsize=-1])");
+"MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])");
 
 
 /* MQType.tp_finalize */
