@@ -30,6 +30,9 @@
 #include <mqueue.h>
 
 
+#define S_IMODE 07777
+
+
 /* forward declarations */
 static PyModuleDef mqueue_def;
 
@@ -142,6 +145,7 @@ _MQ_New(MQ *self, PyObject *args, PyObject *kwargs)
     PyObject *name = NULL, *bytes = NULL;
     char *filename = NULL;
     struct mq_attr attr = { .mq_maxmsg = -1, .mq_msgsize = -1 };
+    struct stat st;
 
     if (!(state = mqueue_getstate()) ||
         !PyArg_ParseTupleAndKeywords(args, kwargs, "Ui|Ill:__new__", kwlist,
@@ -151,10 +155,12 @@ _MQ_New(MQ *self, PyObject *args, PyObject *kwargs)
         return -1;
     }
 
+    /* self->name, self->bytes */
     _Py_SET_MEMBER(self->name, name);
     _Py_SET_MEMBER(self->bytes, bytes);
     Py_DECREF(bytes);
 
+    /* self->mqd */
     if (attr.mq_maxmsg < 0) {
         attr.mq_maxmsg = state->default_maxmsg;
     }
@@ -205,6 +211,16 @@ _MQ_New(MQ *self, PyObject *args, PyObject *kwargs)
         return -1;
     }
 
+    /* self->mode */
+    memset(&st, 0, sizeof(struct stat));
+    if (fstat(self->mqd, &st)) {
+        _PyErr_SetFromErrno();
+        return -1;
+    }
+    self->mode = st.st_mode;
+    //self->mode = (st.st_mode & S_IMODE);
+
+    /* self->maxmsg, self->msgsize */
     memset(&attr, 0, sizeof(struct mq_attr));
     if (mq_getattr(self->mqd, &attr)) {
         _PyErr_SetFromErrno();
@@ -213,6 +229,7 @@ _MQ_New(MQ *self, PyObject *args, PyObject *kwargs)
     self->maxmsg = attr.mq_maxmsg;
     self->msgsize = attr.mq_msgsize;
 
+    /* self->msg */
     if (!(self->msg = PyObject_Malloc(self->msgsize))) {
         PyErr_NoMemory();
         return -1;
