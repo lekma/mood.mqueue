@@ -5,8 +5,8 @@ Python POSIX message queues interface (Linux only)
 
 POSIX message queues allow processes to exchange data in the form of messages.
 
-**See also:** `mq_overview(7) - overview of POSIX message queues
-<https://linux.die.net/man/7/mq_overview>`_
+**See also:** `mq_overview - overview of POSIX message queues
+<http://man7.org/linux/man-pages/man7/mq_overview.7.html>`_
 
 
 -----
@@ -69,10 +69,20 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
             * stat.S_IXOTH_
 
         * maxmsg (int: -1)
-            TODO.
+            *maxmsg* is an upper limit on the number of messages that may be
+            placed on the queue using `send()`_.
+            If omitted or specified as a negative number, the value in
+            ``/proc/sys/fs/mqueue/msg_default`` is used.
+            The maximum value allowed is defined in
+            ``/proc/sys/fs/mqueue/msg_max``.
 
         * msgsize (int: -1)
-            TODO.
+            *msgsize* is an upper limit on the size of messages that may be
+            placed on the queue.
+            If omitted or specified as a negative number, the value in
+            ``/proc/sys/fs/mqueue/msgsize_default`` is used.
+            The maximum value allowed is defined in
+            ``/proc/sys/fs/mqueue/msgsize_max``.
 
 
     .. _close():
@@ -97,39 +107,27 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
         Receives and returns one message.
 
 
-    name
-        *read only*
-
-        TODO.
+    name (*read only*)
+        This queue's *name*.
 
 
-    flags
-        *read only*
-
-        TODO.
+    flags (*read only*)
+        *flags* argument passed to the constructor.
 
 
-    mode
-        *read only*
-
-        TODO.
+    mode (*read only*)
+        Permission bits.
 
 
-    maxmsg
-        *read only*
-
-        TODO.
+    maxmsg (*read only*)
+        Maximum number of messages.
 
 
-    msgsize
-        *read only*
-
-        TODO.
+    msgsize (*read only*)
+        Maximum message size (in bytes).
 
 
-    closed
-        *read only*
-
+    closed (*read only*)
         ``True`` if the message queue is closed (i.e. `close()`_ has been
         called). ``False`` otherwise.
 
@@ -143,8 +141,10 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
 .. _os.O_EXCL: https://docs.python.org/3.5/library/os.html#os.O_EXCL
 .. _errno.EAGAIN: https://docs.python.org/3.5/library/errno.html#errno.EAGAIN
 .. _errno.EEXIST: https://docs.python.org/3.5/library/errno.html#errno.EEXIST
+.. _errno.EINVAL: https://docs.python.org/3.5/library/errno.html#errno.EINVAL
 .. _BlockingIOError: https://docs.python.org/3.5/library/exceptions.html#BlockingIOError
 .. _FileExistsError: https://docs.python.org/3.5/library/exceptions.html#FileExistsError
+.. _OSError: https://docs.python.org/3.5/library/exceptions.html#OSError
 .. _stat.S_IRWXU: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXU
 .. _stat.S_IRUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IRUSR
 .. _stat.S_IWUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IWUSR

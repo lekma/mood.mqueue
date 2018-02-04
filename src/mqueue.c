@@ -217,8 +217,7 @@ _MQ_New(MQ *self, PyObject *args, PyObject *kwargs)
         _PyErr_SetFromErrno();
         return -1;
     }
-    self->mode = st.st_mode;
-    //self->mode = (st.st_mode & S_IMODE);
+    self->mode = (st.st_mode & S_IMODE);
 
     /* self->maxmsg, self->msgsize */
     memset(&attr, 0, sizeof(struct mq_attr));
