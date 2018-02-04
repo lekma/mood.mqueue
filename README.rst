@@ -116,7 +116,8 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
 
 
     mode (*read only*)
-        Permission bits.
+        File mode. The constants and functions in the stat_ module can be used
+        to interpret it.
 
 
     maxmsg (*read only*)
@@ -145,6 +146,7 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
 .. _BlockingIOError: https://docs.python.org/3.5/library/exceptions.html#BlockingIOError
 .. _FileExistsError: https://docs.python.org/3.5/library/exceptions.html#FileExistsError
 .. _OSError: https://docs.python.org/3.5/library/exceptions.html#OSError
+.. _stat: https://docs.python.org/3.5/library/stat.html#module-stat
 .. _stat.S_IRWXU: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXU
 .. _stat.S_IRUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IRUSR
 .. _stat.S_IWUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IWUSR

@@ -30,9 +30,6 @@
 #include <mqueue.h>
 
 
-#define S_IMODE 07777
-
-
 /* forward declarations */
 static PyModuleDef mqueue_def;
 
@@ -217,7 +214,7 @@ _MQ_New(MQ *self, PyObject *args, PyObject *kwargs)
         _PyErr_SetFromErrno();
         return -1;
     }
-    self->mode = (st.st_mode & S_IMODE);
+    self->mode = st.st_mode;
 
     /* self->maxmsg, self->msgsize */
     memset(&attr, 0, sizeof(struct mq_attr));
