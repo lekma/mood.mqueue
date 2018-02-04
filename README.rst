@@ -73,7 +73,7 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
             placed on the queue using `send()`_.
             If omitted or specified as a negative number, the value in
             ``/proc/sys/fs/mqueue/msg_default`` is used.
-            The maximum value allowed is defined in
+            The maximum value for *maxmsg* is defined in
             ``/proc/sys/fs/mqueue/msg_max``.
 
         * msgsize (int: -1)
@@ -81,7 +81,7 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
             placed on the queue.
             If omitted or specified as a negative number, the value in
             ``/proc/sys/fs/mqueue/msgsize_default`` is used.
-            The maximum value allowed is defined in
+            The maximum value for *msgsize* is defined in
             ``/proc/sys/fs/mqueue/msgsize_max``.
 
 
