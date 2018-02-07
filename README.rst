@@ -22,30 +22,30 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
     * flags (int)
         Exactly one of the following must be specified in *flags*:
 
-        * os.O_RDONLY_
+        * O_RDONLY_
             Open the queue to receive messages only.
 
-        * os.O_WRONLY_
+        * O_WRONLY_
             Open the queue to send messages only.
 
-        * os.O_RDWR_
+        * O_RDWR_
             Open the queue to both send and receive messages.
 
         Zero or more of the following flags can additionally be ORed in *flags*:
 
-        * os.O_NONBLOCK_
+        * O_NONBLOCK_
             Open the queue in nonblocking mode. In circumstances where `recv()`_
             and `send()`_ would normally block, these methods instead raise
             BlockingIOError_.
 
-        * os.O_CREAT_
+        * O_CREAT_
             Create the message queue if it does not exist.
 
-        * os.O_EXCL_
-            If os.O_CREAT_ was specified in *flags*, and a queue with the given
+        * O_EXCL_
+            If O_CREAT_ was specified in *flags*, and a queue with the given
             *name* already exists, then raise FileExistsError_.
 
-        If os.O_CREAT_ is specified in *flags*, then three additional optional
+        If O_CREAT_ is specified in *flags*, then three additional optional
         arguments can be supplied:
 
         * mode (int: 0o600)
@@ -55,18 +55,18 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
             *mode* may take one of the following values or bitwise ORed
             combinations of them:
 
-            * stat.S_IRWXU_
-            * stat.S_IRUSR_
-            * stat.S_IWUSR_
-            * stat.S_IXUSR_
-            * stat.S_IRWXG_
-            * stat.S_IRGRP_
-            * stat.S_IWGRP_
-            * stat.S_IXGRP_
-            * stat.S_IRWXO_
-            * stat.S_IROTH_
-            * stat.S_IWOTH_
-            * stat.S_IXOTH_
+            * S_IRWXU_
+            * S_IRUSR_
+            * S_IWUSR_
+            * S_IXUSR_
+            * S_IRWXG_
+            * S_IRGRP_
+            * S_IWGRP_
+            * S_IXGRP_
+            * S_IRWXO_
+            * S_IROTH_
+            * S_IWOTH_
+            * S_IXOTH_
 
         * maxmsg (int: -1)
             *maxmsg* is an upper limit on the number of messages that may be
@@ -101,6 +101,13 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
         Sends one bytes-like_ *message*. Returns the number of bytes sent.
 
 
+    .. _sendall():
+
+    sendall(message)
+        Sends one bytes-like_ *message*. This calls `send()`_ repeatedly until
+        all data is sent.
+
+
     .. _recv():
 
     recv() -> bytes
@@ -120,6 +127,11 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
         to interpret it.
 
 
+    blocking (*read only*)
+        ``False`` if O_NONBLOCK_ was ORed in the *flags* argument passed to the
+        constructor. ``True`` otherwise.
+
+
     maxmsg (*read only*)
         Maximum number of messages.
 
@@ -134,12 +146,12 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
 
 
 .. _bytes-like: https://docs.python.org/3.5/glossary.html#term-bytes-like-object
-.. _os.O_RDONLY: https://docs.python.org/3.5/library/os.html#os.O_RDONLY
-.. _os.O_WRONLY: https://docs.python.org/3.5/library/os.html#os.O_WRONLY
-.. _os.O_RDWR: https://docs.python.org/3.5/library/os.html#os.O_RDWR
-.. _os.O_NONBLOCK: https://docs.python.org/3.5/library/os.html#os.O_NONBLOCK
-.. _os.O_CREAT: https://docs.python.org/3.5/library/os.html#os.O_CREAT
-.. _os.O_EXCL: https://docs.python.org/3.5/library/os.html#os.O_EXCL
+.. _O_RDONLY: https://docs.python.org/3.5/library/os.html#os.O_RDONLY
+.. _O_WRONLY: https://docs.python.org/3.5/library/os.html#os.O_WRONLY
+.. _O_RDWR: https://docs.python.org/3.5/library/os.html#os.O_RDWR
+.. _O_NONBLOCK: https://docs.python.org/3.5/library/os.html#os.O_NONBLOCK
+.. _O_CREAT: https://docs.python.org/3.5/library/os.html#os.O_CREAT
+.. _O_EXCL: https://docs.python.org/3.5/library/os.html#os.O_EXCL
 .. _errno.EAGAIN: https://docs.python.org/3.5/library/errno.html#errno.EAGAIN
 .. _errno.EEXIST: https://docs.python.org/3.5/library/errno.html#errno.EEXIST
 .. _errno.EINVAL: https://docs.python.org/3.5/library/errno.html#errno.EINVAL
@@ -147,16 +159,16 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
 .. _FileExistsError: https://docs.python.org/3.5/library/exceptions.html#FileExistsError
 .. _OSError: https://docs.python.org/3.5/library/exceptions.html#OSError
 .. _stat: https://docs.python.org/3.5/library/stat.html#module-stat
-.. _stat.S_IRWXU: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXU
-.. _stat.S_IRUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IRUSR
-.. _stat.S_IWUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IWUSR
-.. _stat.S_IXUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IXUSR
-.. _stat.S_IRWXG: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXG
-.. _stat.S_IRGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IRGRP
-.. _stat.S_IWGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IWGRP
-.. _stat.S_IXGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IXGRP
-.. _stat.S_IRWXO: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXO
-.. _stat.S_IROTH: https://docs.python.org/3.5/library/stat.html#stat.S_IROTH
-.. _stat.S_IWOTH: https://docs.python.org/3.5/library/stat.html#stat.S_IWOTH
-.. _stat.S_IXOTH: https://docs.python.org/3.5/library/stat.html#stat.S_IXOTH
+.. _S_IRWXU: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXU
+.. _S_IRUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IRUSR
+.. _S_IWUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IWUSR
+.. _S_IXUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IXUSR
+.. _S_IRWXG: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXG
+.. _S_IRGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IRGRP
+.. _S_IWGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IWGRP
+.. _S_IXGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IXGRP
+.. _S_IRWXO: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXO
+.. _S_IROTH: https://docs.python.org/3.5/library/stat.html#stat.S_IROTH
+.. _S_IWOTH: https://docs.python.org/3.5/library/stat.html#stat.S_IWOTH
+.. _S_IXOTH: https://docs.python.org/3.5/library/stat.html#stat.S_IXOTH
 
