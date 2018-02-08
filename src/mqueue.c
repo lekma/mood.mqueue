@@ -108,7 +108,7 @@ typedef struct {
     char *msg;
     Py_ssize_t msgsize;
     Py_ssize_t maxmsg;
-    char blocking;
+    int blocking;
     mode_t mode;
     int flags;
     int owner;
@@ -116,22 +116,21 @@ typedef struct {
 } MQ;
 
 
-static int
-_MQ_Close(MQ *self)
+static MQ *
+_MQ_Alloc(PyTypeObject *type)
 {
-    int res = 0;
-    char *filename = PyBytes_AS_STRING(self->bytes);
+    MQ *self = NULL;
 
-    if (self->mqd != -1) {
-        if ((res = mq_close(self->mqd))) {
-            _PyErr_SetFromErrno();
-        }
-        else if (self->owner && (res = mq_unlink(filename))) {
-            _PyErr_SetFromErrnoWithFilename(filename);
-        }
+    if ((self = __PyObject_Alloc(MQ, type))) {
+        self->msgsize = -1;
+        self->maxmsg = -1;
+        self->blocking = 1;
+        self->mode = S_IRUSR | S_IWUSR; // ReadWrite by owner;
+        self->owner = 0;
         self->mqd = -1;
+        PyObject_GC_Track(self);
     }
-    return res;
+    return self;
 }
 
 
@@ -237,51 +236,98 @@ _MQ_New(MQ *self, PyObject *args, PyObject *kwargs)
 }
 
 
-static MQ *
-_MQ_Alloc(PyTypeObject *type)
+/* close */
+static int
+_MQ_Close(MQ *self)
 {
-    MQ *self = NULL;
+    int res = 0;
+    char *filename = PyBytes_AS_STRING(self->bytes);
 
-    if ((self = __PyObject_Alloc(MQ, type))) {
-        self->msgsize = -1;
-        self->maxmsg = -1;
-        self->blocking = 1;
-        self->mode = S_IRUSR | S_IWUSR; // ReadWrite by owner;
-        self->owner = 0;
+    if (self->mqd != -1) {
+        if ((res = mq_close(self->mqd))) {
+            _PyErr_SetFromErrno();
+        }
+        else if (self->owner && (res = mq_unlink(filename))) {
+            _PyErr_SetFromErrnoWithFilename(filename);
+        }
         self->mqd = -1;
-        PyObject_GC_Track(self);
     }
-    return self;
+    return res;
 }
 
 
-static inline Py_ssize_t
-_MQ_Recv(MQ *self)
-{
-    Py_ssize_t rcvd = -1;
-
-    if (self->blocking) {
-        Py_BEGIN_ALLOW_THREADS
-        rcvd = mq_receive(self->mqd, self->msg, self->msgsize, NULL);
-        Py_END_ALLOW_THREADS
-        return rcvd;
-    }
-    return mq_receive(self->mqd, self->msg, self->msgsize, NULL);
-}
+/* send */
+#define _mq_send(mqd, msg, size) \
+    mq_send((mqd), (msg), (size), 0)
 
 
 static inline int
-_MQ_Send(MQ *self, const char *buf, Py_ssize_t size)
+__mq_send(mqd_t mqd, const char *msg, size_t size)
 {
     int res = -1;
 
+    Py_BEGIN_ALLOW_THREADS
+    res = _mq_send(mqd, msg, size);
+    Py_END_ALLOW_THREADS
+    return res;
+}
+
+
+static int
+_MQ_Send(MQ *self, const char *buf, Py_ssize_t size)
+{
     if (self->blocking) {
-        Py_BEGIN_ALLOW_THREADS
-        res = mq_send(self->mqd, buf, size, 0);
-        Py_END_ALLOW_THREADS
-        return res;
+        return __mq_send(self->mqd, buf, size);
     }
-    return mq_send(self->mqd, buf, size, 0);;
+    return _mq_send(self->mqd, buf, size);
+}
+
+
+/* recv */
+#define _mq_recv(mqd, msg, size) \
+    mq_receive((mqd), (msg), (size), NULL)
+
+
+static inline ssize_t
+__mq_recv(mqd_t mqd, char *msg, size_t size)
+{
+    ssize_t rcvd = -1;
+
+    Py_BEGIN_ALLOW_THREADS
+    rcvd = _mq_recv(mqd, msg, size);
+    Py_END_ALLOW_THREADS
+    return rcvd;
+}
+
+
+static Py_ssize_t
+_MQ_Recv(MQ *self)
+{
+    if (self->blocking) {
+        return __mq_recv(self->mqd, self->msg, self->msgsize);
+    }
+    return _mq_recv(self->mqd, self->msg, self->msgsize);
+}
+
+
+/* blocking */
+static int
+_MQ_SetBlocking(MQ *self, int blocking)
+{
+    struct mq_attr attr;
+
+    if (blocking != self->blocking) {
+        memset(&attr, 0, sizeof(struct mq_attr));
+        if (!blocking) {
+            attr.mq_flags = O_NONBLOCK;
+        }
+        if (mq_setattr(self->mqd, &attr, NULL)) {
+            _PyErr_SetFromErrno();
+            return -1;
+        }
+        self->blocking = blocking;
+    }
+    return 0;
 }
 
 
@@ -532,7 +578,6 @@ static PyMemberDef MQ_tp_members[] = {
     {"name", T_OBJECT_EX, offsetof(MQ, name), READONLY, NULL},
     {"flags", T_INT, offsetof(MQ, flags), READONLY, NULL},
     {"mode", T_UINT, offsetof(MQ, mode), READONLY, NULL},
-    {"blocking", T_BOOL, offsetof(MQ, blocking), READONLY, NULL},
     {"maxmsg", T_PYSSIZET, offsetof(MQ, maxmsg), READONLY, NULL},
     {"msgsize", T_PYSSIZET, offsetof(MQ, msgsize), READONLY, NULL},
     {NULL}  /* Sentinel */
@@ -543,13 +588,37 @@ static PyMemberDef MQ_tp_members[] = {
 static PyObject *
 MQ_closed_get(MQ *self, void *closure)
 {
-    _Py_RETURN_OBJECT(((self->mqd == -1) ? Py_True : Py_False));
+    return PyBool_FromLong((self->mqd == -1));
+}
+
+
+/* MQ.blocking */
+static PyObject *
+MQ_blocking_get(MQ *self, void *closure)
+{
+    return PyBool_FromLong(self->blocking);
+}
+
+static int
+MQ_blocking_set(MQ *self, PyObject *value, void *closure)
+{
+    int blocking = -1;
+
+    if (!value) {
+        PyErr_SetString(PyExc_TypeError, "cannot delete attribute");
+        return -1;
+    }
+    if ((blocking = PyObject_IsTrue(value)) < 0) {
+        return -1;
+    }
+    return _MQ_SetBlocking(self, blocking);
 }
 
 
 /* MQType.tp_getsets */
 static PyGetSetDef MQ_tp_getsets[] = {
     {"closed", (getter)MQ_closed_get, NULL, NULL, NULL},
+    {"blocking", (getter)MQ_blocking_get, (setter)MQ_blocking_set, NULL, NULL},
     {NULL}  /* Sentinel */
 };
 

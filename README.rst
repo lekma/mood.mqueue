@@ -33,6 +33,14 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
 
         Zero or more of the following flags can additionally be ORed in *flags*:
 
+        * O_CLOEXEC_
+            Enable the ``close-on-exec`` flag for the new file descriptor.
+
+            **See:** `Inheritance of File Descriptors
+            <https://docs.python.org/3.5/library/os.html#fd-inheritance>`_ and
+            `Secure File Descriptor Handling
+            <http://udrepper.livejournal.com/20407.html>`_.
+
         * O_NONBLOCK_
             Open the queue in nonblocking mode. In circumstances where `recv()`_
             and `send()`_ would normally block, these methods instead raise
@@ -127,11 +135,6 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
         to interpret it.
 
 
-    blocking (*read only*)
-        ``False`` if O_NONBLOCK_ was ORed in the *flags* argument passed to the
-        constructor. ``True`` otherwise.
-
-
     maxmsg (*read only*)
         Maximum number of messages.
 
@@ -145,10 +148,18 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
         called). ``False`` otherwise.
 
 
+    blocking
+        Get/set the blocking mode of the queue.
+        Set to ``False`` if you want to put the queue in nonblocking mode.
+        The initial blocking mode is set by the presence/absence of O_NONBLOCK_
+        in the *flags* argument passed to the constructor.
+
+
 .. _bytes-like: https://docs.python.org/3.5/glossary.html#term-bytes-like-object
 .. _O_RDONLY: https://docs.python.org/3.5/library/os.html#os.O_RDONLY
 .. _O_WRONLY: https://docs.python.org/3.5/library/os.html#os.O_WRONLY
 .. _O_RDWR: https://docs.python.org/3.5/library/os.html#os.O_RDWR
+.. _O_CLOEXEC: https://docs.python.org/3.5/library/os.html#os.O_CLOEXEC
 .. _O_NONBLOCK: https://docs.python.org/3.5/library/os.html#os.O_NONBLOCK
 .. _O_CREAT: https://docs.python.org/3.5/library/os.html#os.O_CREAT
 .. _O_EXCL: https://docs.python.org/3.5/library/os.html#os.O_EXCL
