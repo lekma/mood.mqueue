@@ -126,7 +126,6 @@ _MQ_Alloc(PyTypeObject *type)
         self->maxmsg = -1;
         self->blocking = 1;
         self->mode = S_IRUSR | S_IWUSR; // ReadWrite by owner;
-        self->owner = 0;
         self->mqd = -1;
         PyObject_GC_Track(self);
     }
