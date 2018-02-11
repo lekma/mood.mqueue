@@ -254,7 +254,7 @@ _MQ_Close(MQ *self)
 }
 
 
-static int
+static inline int
 _MQ_Send(MQ *self, const char *buf, Py_ssize_t size)
 {
     int res = -1;
@@ -266,7 +266,7 @@ _MQ_Send(MQ *self, const char *buf, Py_ssize_t size)
 }
 
 
-static Py_ssize_t
+static inline Py_ssize_t
 _MQ_Recv(MQ *self)
 {
     ssize_t rcvd = -1;
