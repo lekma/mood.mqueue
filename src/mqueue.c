@@ -235,7 +235,6 @@ _MQ_New(MQ *self, PyObject *args, PyObject *kwargs)
 }
 
 
-/* close */
 static int
 _MQ_Close(MQ *self)
 {
@@ -255,61 +254,30 @@ _MQ_Close(MQ *self)
 }
 
 
-/* send */
-#define _mq_send(mqd, msg, size) \
-    mq_send((mqd), (msg), (size), 0)
-
-
-static inline int
-__mq_send(mqd_t mqd, const char *msg, size_t size)
+static int
+_MQ_Send(MQ *self, const char *buf, Py_ssize_t size)
 {
     int res = -1;
 
     Py_BEGIN_ALLOW_THREADS
-    res = _mq_send(mqd, msg, size);
+    res = mq_send(self->mqd, buf, size, 0);
     Py_END_ALLOW_THREADS
     return res;
-}
-
-
-static int
-_MQ_Send(MQ *self, const char *buf, Py_ssize_t size)
-{
-    if (self->blocking) {
-        return __mq_send(self->mqd, buf, size);
-    }
-    return _mq_send(self->mqd, buf, size);
-}
-
-
-/* recv */
-#define _mq_recv(mqd, msg, size) \
-    mq_receive((mqd), (msg), (size), NULL)
-
-
-static inline ssize_t
-__mq_recv(mqd_t mqd, char *msg, size_t size)
-{
-    ssize_t rcvd = -1;
-
-    Py_BEGIN_ALLOW_THREADS
-    rcvd = _mq_recv(mqd, msg, size);
-    Py_END_ALLOW_THREADS
-    return rcvd;
 }
 
 
 static Py_ssize_t
 _MQ_Recv(MQ *self)
 {
-    if (self->blocking) {
-        return __mq_recv(self->mqd, self->msg, self->msgsize);
-    }
-    return _mq_recv(self->mqd, self->msg, self->msgsize);
+    ssize_t rcvd = -1;
+
+    Py_BEGIN_ALLOW_THREADS
+    rcvd = mq_receive(self->mqd, self->msg, self->msgsize, NULL);
+    Py_END_ALLOW_THREADS
+    return rcvd;
 }
 
 
-/* blocking */
 static int
 _MQ_SetBlocking(MQ *self, int blocking)
 {
