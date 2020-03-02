@@ -27,7 +27,7 @@ from os.path import abspath
 
 
 pkg_name = "mood.mqueue"
-pkg_version = "1.0.2"
+pkg_version = "1.1.0"
 pkg_desc = "Python POSIX message queues interface (Linux only)"
 
 PKG_VERSION = ("PKG_VERSION", "\"{0}\"".format(pkg_version))
@@ -52,7 +52,7 @@ setup(
       keywords="linux mqueue",
 
       setup_requires = ["setuptools>=24.2.0"],
-      python_requires="~=3.5",
+      python_requires="~=3.8",
       packages=find_packages(),
       namespace_packages=["mood"],
       zip_safe=False,
@@ -68,7 +68,7 @@ setup(
           "Intended Audience :: Developers",
           "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
           "Operating System :: POSIX :: Linux",
-          "Programming Language :: Python :: 3.5",
+          "Programming Language :: Python :: 3.8",
           "Programming Language :: Python :: Implementation :: CPython"
       ]
 )

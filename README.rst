@@ -37,7 +37,7 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
             Enable the ``close-on-exec`` flag for the new file descriptor.
 
             **See:** `Inheritance of File Descriptors
-            <https://docs.python.org/3.5/library/os.html#fd-inheritance>`_ and
+            <https://docs.python.org/3.8/library/os.html#fd-inheritance>`_ and
             `Secure File Descriptor Handling
             <http://udrepper.livejournal.com/20407.html>`_.
 
@@ -155,31 +155,31 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
         in the *flags* argument passed to the constructor.
 
 
-.. _bytes-like: https://docs.python.org/3.5/glossary.html#term-bytes-like-object
-.. _O_RDONLY: https://docs.python.org/3.5/library/os.html#os.O_RDONLY
-.. _O_WRONLY: https://docs.python.org/3.5/library/os.html#os.O_WRONLY
-.. _O_RDWR: https://docs.python.org/3.5/library/os.html#os.O_RDWR
-.. _O_CLOEXEC: https://docs.python.org/3.5/library/os.html#os.O_CLOEXEC
-.. _O_NONBLOCK: https://docs.python.org/3.5/library/os.html#os.O_NONBLOCK
-.. _O_CREAT: https://docs.python.org/3.5/library/os.html#os.O_CREAT
-.. _O_EXCL: https://docs.python.org/3.5/library/os.html#os.O_EXCL
-.. _errno.EAGAIN: https://docs.python.org/3.5/library/errno.html#errno.EAGAIN
-.. _errno.EEXIST: https://docs.python.org/3.5/library/errno.html#errno.EEXIST
-.. _errno.EINVAL: https://docs.python.org/3.5/library/errno.html#errno.EINVAL
-.. _BlockingIOError: https://docs.python.org/3.5/library/exceptions.html#BlockingIOError
-.. _FileExistsError: https://docs.python.org/3.5/library/exceptions.html#FileExistsError
-.. _OSError: https://docs.python.org/3.5/library/exceptions.html#OSError
-.. _stat: https://docs.python.org/3.5/library/stat.html#module-stat
-.. _S_IRWXU: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXU
-.. _S_IRUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IRUSR
-.. _S_IWUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IWUSR
-.. _S_IXUSR: https://docs.python.org/3.5/library/stat.html#stat.S_IXUSR
-.. _S_IRWXG: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXG
-.. _S_IRGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IRGRP
-.. _S_IWGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IWGRP
-.. _S_IXGRP: https://docs.python.org/3.5/library/stat.html#stat.S_IXGRP
-.. _S_IRWXO: https://docs.python.org/3.5/library/stat.html#stat.S_IRWXO
-.. _S_IROTH: https://docs.python.org/3.5/library/stat.html#stat.S_IROTH
-.. _S_IWOTH: https://docs.python.org/3.5/library/stat.html#stat.S_IWOTH
-.. _S_IXOTH: https://docs.python.org/3.5/library/stat.html#stat.S_IXOTH
+.. _bytes-like: https://docs.python.org/3.8/glossary.html#term-bytes-like-object
+.. _O_RDONLY: https://docs.python.org/3.8/library/os.html#os.O_RDONLY
+.. _O_WRONLY: https://docs.python.org/3.8/library/os.html#os.O_WRONLY
+.. _O_RDWR: https://docs.python.org/3.8/library/os.html#os.O_RDWR
+.. _O_CLOEXEC: https://docs.python.org/3.8/library/os.html#os.O_CLOEXEC
+.. _O_NONBLOCK: https://docs.python.org/3.8/library/os.html#os.O_NONBLOCK
+.. _O_CREAT: https://docs.python.org/3.8/library/os.html#os.O_CREAT
+.. _O_EXCL: https://docs.python.org/3.8/library/os.html#os.O_EXCL
+.. _errno.EAGAIN: https://docs.python.org/3.8/library/errno.html#errno.EAGAIN
+.. _errno.EEXIST: https://docs.python.org/3.8/library/errno.html#errno.EEXIST
+.. _errno.EINVAL: https://docs.python.org/3.8/library/errno.html#errno.EINVAL
+.. _BlockingIOError: https://docs.python.org/3.8/library/exceptions.html#BlockingIOError
+.. _FileExistsError: https://docs.python.org/3.8/library/exceptions.html#FileExistsError
+.. _OSError: https://docs.python.org/3.8/library/exceptions.html#OSError
+.. _stat: https://docs.python.org/3.8/library/stat.html#module-stat
+.. _S_IRWXU: https://docs.python.org/3.8/library/stat.html#stat.S_IRWXU
+.. _S_IRUSR: https://docs.python.org/3.8/library/stat.html#stat.S_IRUSR
+.. _S_IWUSR: https://docs.python.org/3.8/library/stat.html#stat.S_IWUSR
+.. _S_IXUSR: https://docs.python.org/3.8/library/stat.html#stat.S_IXUSR
+.. _S_IRWXG: https://docs.python.org/3.8/library/stat.html#stat.S_IRWXG
+.. _S_IRGRP: https://docs.python.org/3.8/library/stat.html#stat.S_IRGRP
+.. _S_IWGRP: https://docs.python.org/3.8/library/stat.html#stat.S_IWGRP
+.. _S_IXGRP: https://docs.python.org/3.8/library/stat.html#stat.S_IXGRP
+.. _S_IRWXO: https://docs.python.org/3.8/library/stat.html#stat.S_IRWXO
+.. _S_IROTH: https://docs.python.org/3.8/library/stat.html#stat.S_IROTH
+.. _S_IWOTH: https://docs.python.org/3.8/library/stat.html#stat.S_IWOTH
+.. _S_IXOTH: https://docs.python.org/3.8/library/stat.html#stat.S_IXOTH
 
