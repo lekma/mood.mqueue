@@ -27,7 +27,7 @@ from os.path import abspath
 
 
 pkg_name = "mood.mqueue"
-pkg_version = "1.1.0"
+pkg_version = "1.3.0"
 pkg_desc = "Python POSIX message queues interface (Linux only)"
 
 PKG_VERSION = ("PKG_VERSION", "\"{0}\"".format(pkg_version))
