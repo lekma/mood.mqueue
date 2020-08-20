@@ -27,7 +27,7 @@ from os.path import abspath
 
 
 pkg_name = "mood.mqueue"
-pkg_version = "1.3.0"
+pkg_version = "1.5.0"
 pkg_desc = "Python POSIX message queues interface (Linux only)"
 
 PKG_VERSION = ("PKG_VERSION", "\"{0}\"".format(pkg_version))
@@ -59,8 +59,15 @@ setup(
 
       ext_package="mood",
       ext_modules=[
-          Extension("mqueue", ["src/mqueue.c"], define_macros=[PKG_VERSION],
-                    libraries=["rt"])
+          Extension(
+                    "mqueue",
+                    [
+                     "src/helpers/helpers.c",
+                     "src/mqueue.c"
+                    ],
+                    define_macros=[PKG_VERSION],
+                    libraries=["rt"]
+                   )
       ],
 
       classifiers=[
