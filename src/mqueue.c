@@ -254,7 +254,7 @@ __mq_setblocking(MessageQueue *self, int blocking)
 /* -------------------------------------------------------------------------- */
 
 static inline int
-__mq_send__(MessageQueue *self, const char *buf, Py_ssize_t size, unsigned int priority)
+__mq_send(MessageQueue *self, const char *buf, Py_ssize_t size, unsigned int priority)
 {
     int res = -1;
 
@@ -266,7 +266,7 @@ __mq_send__(MessageQueue *self, const char *buf, Py_ssize_t size, unsigned int p
 
 
 static inline Py_ssize_t
-__mq_receive__(MessageQueue *self)
+__mq_receive(MessageQueue *self)
 {
     Py_ssize_t size = -1;
 
@@ -274,24 +274,6 @@ __mq_receive__(MessageQueue *self)
     size = mq_receive(self->mqd, self->msg, self->attr.mq_msgsize, NULL);
     Py_END_ALLOW_THREADS
     return size;
-}
-
-
-static void
-__mq_callback__(union sigval sv)
-{
-    PyGILState_STATE gstate = PyGILState_Ensure();
-    MessageQueue *self = (MessageQueue *)sv.sival_ptr;
-    PyObject *result = NULL;
-
-    if ((result = PyObject_CallFunctionObjArgs(self->callback, self, NULL))) {
-        Py_DECREF(result);
-    }
-    else {
-        PyErr_WriteUnraisable(self->callback);
-    }
-    Py_CLEAR(self->callback);
-    PyGILState_Release(gstate);
 }
 
 
@@ -383,7 +365,7 @@ MessageQueue_close(MessageQueue *self)
 /* MessageQueue.fileno() */
 PyDoc_STRVAR(MessageQueue_fileno_doc,
 "fileno() -> int\n\
-Return the underlying file descriptor.");
+Returns the underlying file descriptor.");
 
 static PyObject *
 MessageQueue_fileno(MessageQueue *self)
@@ -395,7 +377,7 @@ MessageQueue_fileno(MessageQueue *self)
 /* MessageQueue.send(msg[, priority]) */
 PyDoc_STRVAR(MessageQueue_send_doc,
 "send(msg[, priority]) -> int\n\
-Send 1 message. Return the number of bytes sent.");
+Sends 1 message. Returns the number of bytes sent.");
 
 static PyObject *
 MessageQueue_send(MessageQueue *self, PyObject *args)
@@ -408,7 +390,7 @@ MessageQueue_send(MessageQueue *self, PyObject *args)
         return NULL;
     }
     size = Py_MIN(msg.len, self->attr.mq_msgsize);
-    if (__mq_send__(self, msg.buf, size, priority)) {
+    if (__mq_send(self, msg.buf, size, priority)) {
         PyBuffer_Release(&msg);
         return _PyErr_SetFromErrno();
     }
@@ -420,7 +402,7 @@ MessageQueue_send(MessageQueue *self, PyObject *args)
 /* MessageQueue.sendall(msg[, priority]) */
 PyDoc_STRVAR(MessageQueue_sendall_doc,
 "sendall(msg[, priority])\n\
-Send 1 message. This calls send() repeatedly until all data is sent.");
+Sends 1 message. This calls send() repeatedly until all data is sent.");
 
 static PyObject *
 MessageQueue_sendall(MessageQueue *self, PyObject *args)
@@ -438,7 +420,7 @@ MessageQueue_sendall(MessageQueue *self, PyObject *args)
     len = msg.len;
     do {
         size = Py_MIN(len, self->attr.mq_msgsize);
-        if (__mq_send__(self, buf, size, priority)) {
+        if (__mq_send(self, buf, size, priority)) {
             PyBuffer_Release(&msg);
             return _PyErr_SetFromErrno();
         }
@@ -452,20 +434,42 @@ MessageQueue_sendall(MessageQueue *self, PyObject *args)
 
 /* MessageQueue.receive() */
 PyDoc_STRVAR(MessageQueue_receive_doc,
-"receive() -> msg\n\
-Receive 1 message.");
+"receive() -> bytes\n\
+Receives 1 message.");
 
 static PyObject *
 MessageQueue_receive(MessageQueue *self)
 {
     Py_ssize_t size = -1;
 
-    if ((size = __mq_receive__(self)) < 0) {
+    if ((size = __mq_receive(self)) < 0) {
         return _PyErr_SetFromErrno();
     }
     return PyBytes_FromStringAndSize(self->msg, size);
 }
 
+
+/* -------------------------------------------------------------------------- */
+
+static void
+__mq_callback(union sigval sv)
+{
+    PyGILState_STATE gstate = PyGILState_Ensure();
+    MessageQueue *self = (MessageQueue *)sv.sival_ptr;
+    PyObject *result = NULL;
+
+    if ((result = PyObject_CallFunctionObjArgs(self->callback, self, NULL))) {
+        Py_DECREF(result);
+    }
+    else {
+        PyErr_WriteUnraisable(self->callback);
+    }
+    Py_CLEAR(self->callback);
+    PyGILState_Release(gstate);
+}
+
+
+/* -------------------------------------------------------------------------- */
 
 /* MessageQueue.notify([callback]) */
 PyDoc_STRVAR(MessageQueue_notify_doc,
@@ -500,7 +504,7 @@ MessageQueue_notify(MessageQueue *self, PyObject *args)
         }
         else if (PyCallable_Check(callback)) {
             sev.sigev_notify = SIGEV_THREAD;
-            sev.sigev_notify_function = __mq_callback__;
+            sev.sigev_notify_function = __mq_callback;
             sev.sigev_notify_attributes = NULL;
             sev.sigev_value.sival_ptr = self;
         }
@@ -524,6 +528,139 @@ MessageQueue_notify(MessageQueue *self, PyObject *args)
 }
 
 
+/* -------------------------------------------------------------------------- */
+
+static inline int
+__buf_exported(PyByteArrayObject *buf)
+{
+    if (buf->ob_exports > 0) {
+        PyErr_SetString(PyExc_BufferError,
+                        "Existing exports of data: object cannot be re-sized");
+        return -1;
+    }
+    return 0;
+}
+
+
+static inline void
+__buf_shrink(PyByteArrayObject *buf, Py_ssize_t size)
+{
+    // XXX: very bad shortcut ¯\_(ツ)_/¯
+    Py_SIZE(buf) = size;
+    buf->ob_start[size] = '\0';
+}
+
+
+static inline int
+__buf_realloc(PyByteArrayObject *buf, Py_ssize_t nalloc)
+{
+    Py_ssize_t alloc = 0;
+    void *bytes = NULL;
+
+    if (buf->ob_alloc < nalloc) {
+        alloc = Py_MAX(nalloc, (buf->ob_alloc << 1));
+        if (!(bytes = PyObject_Realloc(buf->ob_bytes, alloc))) {
+            return -1;
+        }
+        buf->ob_start = buf->ob_bytes = bytes;
+        buf->ob_alloc = alloc;
+    }
+    return 0;
+}
+
+
+static inline int
+__buf_resize(PyByteArrayObject *buf, size_t size)
+{
+    if ((size >= PY_SSIZE_T_MAX) || __buf_realloc(buf, (size + 1))) {
+        PyErr_NoMemory();
+        return -1;
+    }
+    return 0;
+}
+
+
+static inline int
+__buf_grow(PyByteArrayObject *buf, const char *bytes, size_t size)
+{
+    size_t start = Py_SIZE(buf), nsize = start + size;
+
+    memcpy((buf->ob_bytes + start), bytes, size);
+    Py_SIZE(buf) = nsize;
+    buf->ob_bytes[nsize] = '\0';
+    return 0;
+}
+
+
+/* -------------------------------------------------------------------------- */
+
+/* MessageQueue.fill(buf[, priority]) */
+PyDoc_STRVAR(MessageQueue_fill_doc,
+"fill(buf[, priority])\n\
+Fills the queue with messages from buf.");
+
+static PyObject *
+MessageQueue_fill(MessageQueue *self, PyObject *args)
+{
+    PyByteArrayObject *buf = NULL;
+    unsigned int priority = 0;
+    Py_ssize_t len, size = 0;
+
+    if (!PyArg_ParseTuple(args, "Y|I:fill", &buf, &priority) ||
+        __buf_exported(buf)) {
+        return NULL;
+    }
+    while ((len = Py_SIZE(buf)) > 0) {
+        size = Py_MIN(len, self->attr.mq_msgsize);
+        if (__mq_send(self, buf->ob_start, size, priority)) {
+            return _PyErr_SetFromErrno();
+        }
+        // XXX: very bad shortcut ¯\_(ツ)_/¯
+        buf->ob_start += size;
+        __buf_shrink(buf, (len - size));
+    }
+    Py_RETURN_NONE;
+}
+
+
+/* MessageQueue.drain(buf) */
+PyDoc_STRVAR(MessageQueue_drain_doc,
+"drain(buf) -> bool\n\
+Drains all messages from the queue into buf.\n\
+Stops when receiving an empty message.\n\
+Returns whether the last message received was empty.");
+
+static PyObject *
+MessageQueue_drain(MessageQueue *self, PyObject *args)
+{
+    PyByteArrayObject *buf = NULL;
+    long i, len = 0;
+    Py_ssize_t size = -1;
+
+    if (!PyArg_ParseTuple(args, "Y:drain", &buf) ||
+        __buf_exported(buf)) {
+        return NULL;
+    }
+    if (mq_getattr(self->mqd, &self->attr)) {
+        return _PyErr_SetFromErrno();
+    }
+    len = self->attr.mq_curmsgs ? self->attr.mq_curmsgs : 1;
+    for (i = 0; i < len; ++i) {
+        if ((size = __mq_receive(self)) < 0) {
+            return _PyErr_SetFromErrno();
+        }
+        if (!size) {
+            break;
+        }
+        if ((i == 0 && __buf_resize(buf, (len * self->attr.mq_msgsize))) ||
+            __buf_grow(buf, self->msg, size)) {
+            return NULL;
+        }
+    }
+    return PyBool_FromLong((size == 0));
+}
+
+
 /* MessageQueue_Type.tp_methods */
 static PyMethodDef MessageQueue_tp_methods[] = {
     {"close", (PyCFunction)MessageQueue_close, METH_NOARGS, MessageQueue_close_doc},
@@ -532,6 +669,8 @@ static PyMethodDef MessageQueue_tp_methods[] = {
     {"sendall", (PyCFunction)MessageQueue_sendall, METH_VARARGS, MessageQueue_sendall_doc},
     {"receive", (PyCFunction)MessageQueue_receive, METH_NOARGS, MessageQueue_receive_doc},
     {"notify", (PyCFunction)MessageQueue_notify, METH_VARARGS, MessageQueue_notify_doc},
+    {"fill", (PyCFunction)MessageQueue_fill, METH_VARARGS, MessageQueue_fill_doc},
+    {"drain", (PyCFunction)MessageQueue_drain, METH_VARARGS, MessageQueue_drain_doc},
     {NULL}  /* Sentinel */
 };
 
