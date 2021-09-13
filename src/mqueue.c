@@ -1,6 +1,6 @@
 /*
 #
-# Copyright © 2020 Malek Hadj-Ali
+# Copyright © 2021 Malek Hadj-Ali
 # All rights reserved.
 #
 # This file is part of mood.
@@ -131,11 +131,15 @@ __mq_init(MessageQueue *self, PyObject *args, PyObject *kwargs)
     const char *name = NULL;
     struct stat st = { 0 };
 
-    if (!(state = _module_get_state()) ||
-        !PyArg_ParseTupleAndKeywords(args, kwargs, "O&i|Ill:__new__", kwlist,
-                                     PyUnicode_FSConverter, &self->name,
-                                     &self->flags, &self->mode,
-                                     &self->attr.mq_maxmsg, &self->attr.mq_msgsize)) {
+    if (
+        !(state = _module_get_state()) ||
+        !PyArg_ParseTupleAndKeywords(
+            args, kwargs, "O&i|Ill:__new__", kwlist,
+            PyUnicode_FSConverter, &self->name,
+            &self->flags, &self->mode,
+            &self->attr.mq_maxmsg, &self->attr.mq_msgsize
+        )
+    ) {
         return -1;
     }
 
@@ -326,7 +330,8 @@ MessageQueue_tp_repr(MessageQueue *self)
         result = PyUnicode_FromFormat(
             "<%s('%U', %d, mode=%u, maxmsg=%ld, msgsize=%ld)>",
             Py_TYPE(self)->tp_name, name, self->flags, self->mode,
-            self->attr.mq_maxmsg, self->attr.mq_msgsize);
+            self->attr.mq_maxmsg, self->attr.mq_msgsize
+        );
         Py_DECREF(name);
     }
     return result;
@@ -509,8 +514,10 @@ MessageQueue_notify(MessageQueue *self, PyObject *args)
             sev.sigev_value.sival_ptr = self;
         }
         else {
-            PyErr_SetString(PyExc_TypeError,
-                            "a callable, a signal number or None is required");
+            PyErr_SetString(
+                PyExc_TypeError,
+                "a callable, a signal number or None is required"
+            );
             return NULL;
         }
         sevp = &sev;
@@ -534,8 +541,10 @@ static inline int
 __buf_exported(PyByteArrayObject *buf)
 {
     if (buf->ob_exports > 0) {
-        PyErr_SetString(PyExc_BufferError,
-                        "Existing exports of data: object cannot be re-sized");
+        PyErr_SetString(
+            PyExc_BufferError,
+            "Existing exports of data: object cannot be re-sized"
+        );
         return -1;
     }
     return 0;
@@ -663,24 +672,60 @@ MessageQueue_drain(MessageQueue *self, PyObject *args)
 
 /* MessageQueue_Type.tp_methods */
 static PyMethodDef MessageQueue_tp_methods[] = {
-    {"close", (PyCFunction)MessageQueue_close, METH_NOARGS, MessageQueue_close_doc},
-    {"fileno", (PyCFunction)MessageQueue_fileno, METH_NOARGS, MessageQueue_fileno_doc},
-    {"send", (PyCFunction)MessageQueue_send, METH_VARARGS, MessageQueue_send_doc},
-    {"sendall", (PyCFunction)MessageQueue_sendall, METH_VARARGS, MessageQueue_sendall_doc},
-    {"receive", (PyCFunction)MessageQueue_receive, METH_NOARGS, MessageQueue_receive_doc},
-    {"notify", (PyCFunction)MessageQueue_notify, METH_VARARGS, MessageQueue_notify_doc},
-    {"fill", (PyCFunction)MessageQueue_fill, METH_VARARGS, MessageQueue_fill_doc},
-    {"drain", (PyCFunction)MessageQueue_drain, METH_VARARGS, MessageQueue_drain_doc},
+    {
+        "close", (PyCFunction)MessageQueue_close,
+        METH_NOARGS, MessageQueue_close_doc
+    },
+    {
+        "fileno", (PyCFunction)MessageQueue_fileno,
+        METH_NOARGS, MessageQueue_fileno_doc
+    },
+    {
+        "send", (PyCFunction)MessageQueue_send,
+        METH_VARARGS, MessageQueue_send_doc
+    },
+    {
+        "sendall", (PyCFunction)MessageQueue_sendall,
+        METH_VARARGS, MessageQueue_sendall_doc
+    },
+    {
+        "receive", (PyCFunction)MessageQueue_receive,
+        METH_NOARGS, MessageQueue_receive_doc
+    },
+    {
+        "notify", (PyCFunction)MessageQueue_notify,
+        METH_VARARGS, MessageQueue_notify_doc
+    },
+    {
+        "fill", (PyCFunction)MessageQueue_fill,
+        METH_VARARGS, MessageQueue_fill_doc
+    },
+    {
+        "drain", (PyCFunction)MessageQueue_drain,
+        METH_VARARGS, MessageQueue_drain_doc
+    },
     {NULL}  /* Sentinel */
 };
 
 
 /* MessageQueue_Type.tp_members */
 static PyMemberDef MessageQueue_tp_members[] = {
-    {"flags", T_INT, offsetof(MessageQueue, flags), READONLY, NULL},
-    {"mode", T_UINT, offsetof(MessageQueue, mode), READONLY, NULL},
-    {"maxmsg", T_LONG, offsetof(MessageQueue, attr.mq_maxmsg), READONLY, NULL},
-    {"msgsize", T_LONG, offsetof(MessageQueue, attr.mq_msgsize), READONLY, NULL},
+    {
+        "flags", T_INT, offsetof(MessageQueue, flags),
+        READONLY, NULL
+    },
+    {
+        "mode", T_UINT, offsetof(MessageQueue, mode),
+        READONLY, NULL
+    },
+    {
+        "maxmsg", T_LONG, offsetof(MessageQueue, attr.mq_maxmsg),
+        READONLY, NULL
+    },
+    {
+        "msgsize", T_LONG, offsetof(MessageQueue, attr.mq_msgsize),
+        READONLY, NULL
+    },
     {NULL}  /* Sentinel */
 };
 
@@ -723,12 +768,18 @@ MessageQueue_blocking_set(MessageQueue *self, PyObject *value, void *closure)
 
 /* MessageQueue_Type.tp_getsets */
 static PyGetSetDef MessageQueue_tp_getsets[] = {
-    {"name", (getter)MessageQueue_name_get,
-     _Py_READONLY_ATTRIBUTE, NULL, NULL},
-    {"closed", (getter)MessageQueue_closed_get,
-     _Py_READONLY_ATTRIBUTE, NULL, NULL},
-    {"blocking", (getter)MessageQueue_blocking_get,
-     (setter)MessageQueue_blocking_set, NULL, NULL},
+    {
+        "name", (getter)MessageQueue_name_get,
+        _Py_READONLY_ATTRIBUTE, NULL, NULL
+    },
+    {
+        "closed", (getter)MessageQueue_closed_get,
+        _Py_READONLY_ATTRIBUTE, NULL, NULL
+    },
+    {
+        "blocking", (getter)MessageQueue_blocking_get,
+        (setter)MessageQueue_blocking_set, NULL, NULL
+    },
     {NULL}  /* Sentinel */
 };
 
@@ -809,7 +860,7 @@ _module_state_init(PyObject *module)
         !(state = _PyModule_GetState(module)) ||
         _mqueue_get_limit(MQUEUE_DEFAULT_MAXMSG, &state->default_maxmsg) ||
         _mqueue_get_limit(MQUEUE_DEFAULT_MSGSIZE, &state->default_msgsize)
-       ) {
+    ) {
         return -1;
     }
     state->min_maxmsg = 1;
@@ -825,7 +876,7 @@ _module_init(PyObject *module)
         _module_state_init(module) ||
         PyModule_AddStringConstant(module, "__version__", PKG_VERSION) ||
         _PyModule_AddType(module, "MessageQueue", &MessageQueue_Type)
-       ) {
+    ) {
         return -1;
     }
     return 0;

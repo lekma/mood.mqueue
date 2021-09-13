@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 #
-# Copyright © 2020 Malek Hadj-Ali
+# Copyright © 2021 Malek Hadj-Ali
 # All rights reserved.
 #
 # This file is part of mood.
@@ -27,7 +27,7 @@ from os.path import abspath
 
 
 pkg_name = "mood.mqueue"
-pkg_version = "1.5.0"
+pkg_version = "1.5.1"
 pkg_desc = "Python POSIX message queues interface (Linux only)"
 
 PKG_VERSION = ("PKG_VERSION", "\"{0}\"".format(pkg_version))
