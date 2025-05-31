@@ -240,4 +240,3 @@ MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])
 .. _S_IXOTH: https://docs.python.org/3.8/library/stat.html#stat.S_IXOTH
 .. _S_IMODE(): https://docs.python.org/3.8/library/stat.html#stat.S_IMODE
 .. _S_IFMT(): https://docs.python.org/3.8/library/stat.html#stat.S_IFMT
-

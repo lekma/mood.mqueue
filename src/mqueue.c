@@ -1,25 +1,3 @@
-/*
-#
-# Copyright © 2021 Malek Hadj-Ali
-# All rights reserved.
-#
-# This file is part of mood.
-#
-# mood is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License version 3
-# as published by the Free Software Foundation.
-#
-# mood is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with mood.  If not, see <http://www.gnu.org/licenses/>.
-#
-*/
-
-
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
 #include "structmember.h"
@@ -28,11 +6,14 @@
 
 #include <mqueue.h>
 #include <signal.h>
+#include <sys/resource.h>
 
 
 #define MQUEUE_PROC_INTERFACE "/proc/sys/fs/mqueue"
 #define MQUEUE_DEFAULT_MAXMSG MQUEUE_PROC_INTERFACE "/msg_default"
+#define MQUEUE_MAX_MAXMSG MQUEUE_PROC_INTERFACE "/msg_max"
 #define MQUEUE_DEFAULT_MSGSIZE MQUEUE_PROC_INTERFACE "/msgsize_default"
+#define MQUEUE_MAX_MSGSIZE MQUEUE_PROC_INTERFACE "/msgsize_max"
 
 
 /* MessageQueue */
@@ -51,20 +32,33 @@ typedef struct {
 
 /* module state */
 typedef struct {
+    unsigned long max_bytes;
     long default_maxmsg;
+    long max_maxmsg;
     long min_maxmsg;
     long default_msgsize;
+    long max_msgsize;
     long min_msgsize;
 } module_state;
-
-
-/* fwd decls */
-static module_state *_module_get_state(void);
 
 
 /* --------------------------------------------------------------------------
    helpers
    -------------------------------------------------------------------------- */
+
+static int
+_mqueue_get_rlimit_cur(int resource, unsigned long *value)
+{
+    struct rlimit rl = { 0 };
+
+    if (getrlimit(resource, &rl)) {
+        _PyErr_SetFromErrno();
+        return -1;
+    }
+    *value = rl.rlim_cur;
+    return 0;
+}
+
 
 static int
 _mqueue_get_limit(const char *filename, long *value)
@@ -128,11 +122,12 @@ __mq_init(MessageQueue *self, PyObject *args, PyObject *kwargs)
 {
     static char *kwlist[] = {"name", "flags", "mode", "maxmsg", "msgsize", NULL};
     module_state *state = NULL;
+    unsigned long bytes = 0;
     const char *name = NULL;
     struct stat st = { 0 };
 
     if (
-        !(state = _module_get_state()) ||
+        !(state = __PyObject_GetState__((PyObject *)self)) ||
         !PyArg_ParseTupleAndKeywords(
             args, kwargs, "O&i|Ill:__new__", kwlist,
             PyUnicode_FSConverter, &self->name,
@@ -149,6 +144,16 @@ __mq_init(MessageQueue *self, PyObject *args, PyObject *kwargs)
     else if (self->attr.mq_maxmsg < state->min_maxmsg) {
         self->attr.mq_maxmsg = state->min_maxmsg;
     }
+    if (self->attr.mq_maxmsg > state->max_maxmsg) {
+        PyErr_Format(
+            PyExc_OverflowError,
+            "number of messages in queue (%ld) exceeds '%s' (%ld)",
+            self->attr.mq_maxmsg,
+            MQUEUE_MAX_MAXMSG,
+            state->max_maxmsg
+        );
+        return -1;
+    }
 
     if (self->attr.mq_msgsize < 0) {
         self->attr.mq_msgsize = state->default_msgsize;
@@ -156,9 +161,35 @@ __mq_init(MessageQueue *self, PyObject *args, PyObject *kwargs)
     else if (self->attr.mq_msgsize < state->min_msgsize) {
         self->attr.mq_msgsize = state->min_msgsize;
     }
-    else {
+    /*else {
         // XXX: hmm...?
         self->attr.mq_msgsize = ((self->attr.mq_msgsize + 7) & ~7);
+    }*/
+    if (self->attr.mq_msgsize > state->max_msgsize) {
+        PyErr_Format(
+            PyExc_OverflowError,
+            "message size (%ld) exceeds '%s' (%ld)",
+            self->attr.mq_msgsize,
+            MQUEUE_MAX_MSGSIZE,
+            state->max_msgsize
+        );
+        return -1;
+    }
+
+    /*
+        the error given by linux in case of overflow is not obvious (EMFILE).
+        unfortunately the 96 is platform dependent but it relies on size of
+        stucts that are not exposed (though it seems accurate on x86_64).
+    */
+    bytes = (96 + self->attr.mq_msgsize) * self->attr.mq_maxmsg;
+    if (bytes > state->max_bytes) {
+        PyErr_Format(
+            PyExc_OverflowError,
+            "message queue total size (%lu) exceeds 'RLIMIT_MSGQUEUE' (%lu)",
+            bytes,
+            state->max_bytes
+        );
+        return -1;
     }
 
     name = PyBytes_AS_STRING(self->name);
@@ -250,6 +281,13 @@ __mq_setblocking(MessageQueue *self, int blocking)
             return -1;
         }
         self->attr.mq_flags = attr.mq_flags;
+        // should we?
+        if (blocking) {
+            self->flags &= ~O_NONBLOCK;
+        }
+        else {
+            self->flags |= O_NONBLOCK;
+        }
     }
     return 0;
 }
@@ -283,6 +321,19 @@ __mq_receive(MessageQueue *self)
 
 /* MessageQueue_Type -------------------------------------------------------- */
 
+/* MessageQueue_Type.tp_new */
+static PyObject *
+MessageQueue_tp_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
+{
+    MessageQueue *self = NULL;
+
+    if ((self = __mq_new(type)) && __mq_init(self, args, kwargs)) {
+        Py_CLEAR(self);
+    }
+    return (PyObject *)self;
+}
+
+
 /* MessageQueue_Type.tp_traverse */
 static int
 MessageQueue_tp_traverse(MessageQueue *self, visitproc visit, void *arg)
@@ -290,6 +341,20 @@ MessageQueue_tp_traverse(MessageQueue *self, visitproc visit, void *arg)
     Py_VISIT(self->callback);
     Py_VISIT(self->name);
     return 0;
+}
+
+
+/* MessageQueue_Type.tp_finalize */
+static void
+MessageQueue_tp_finalize(MessageQueue *self)
+{
+    PyObject *exc_type, *exc_value, *exc_traceback;
+
+    PyErr_Fetch(&exc_type, &exc_value, &exc_traceback);
+    if (__mq_close(self)) {
+        PyErr_WriteUnraisable((PyObject *)self);
+    }
+    PyErr_Restore(exc_type, exc_value, exc_traceback);
 }
 
 
@@ -350,12 +415,6 @@ MessageQueue_sq_length(MessageQueue *self)
 }
 
 
-/* MessageQueue_Type.tp_as_sequence */
-static PySequenceMethods MessageQueue_tp_as_sequence = {
-    .sq_length = (lenfunc)MessageQueue_sq_length,
-};
-
-
 /* MessageQueue.close() */
 PyDoc_STRVAR(MessageQueue_close_doc,
 "close()");
@@ -363,7 +422,7 @@ PyDoc_STRVAR(MessageQueue_close_doc,
 static PyObject *
 MessageQueue_close(MessageQueue *self)
 {
-    return (__mq_close(self)) ? NULL : __Py_INCREF(Py_None);
+    return (__mq_close(self)) ? NULL : Py_NewRef(Py_None);
 }
 
 
@@ -766,8 +825,8 @@ MessageQueue_blocking_set(MessageQueue *self, PyObject *value, void *closure)
 }
 
 
-/* MessageQueue_Type.tp_getsets */
-static PyGetSetDef MessageQueue_tp_getsets[] = {
+/* MessageQueue_Type.tp_getset */
+static PyGetSetDef MessageQueue_tp_getset[] = {
     {
         "name", (getter)MessageQueue_name_get,
         _Py_READONLY_ATTRIBUTE, NULL, NULL
@@ -784,49 +843,27 @@ static PyGetSetDef MessageQueue_tp_getsets[] = {
 };
 
 
-/* MessageQueue_Type.tp_new */
-static PyObject *
-MessageQueue_tp_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
-{
-    MessageQueue *self = NULL;
-
-    if ((self = __mq_new(type)) && __mq_init(self, args, kwargs)) {
-        Py_CLEAR(self);
-    }
-    return (PyObject *)self;
-}
-
-
-/* MessageQueue_Type.tp_finalize */
-static void
-MessageQueue_tp_finalize(MessageQueue *self)
-{
-    PyObject *exc_type, *exc_value, *exc_traceback;
-
-    PyErr_Fetch(&exc_type, &exc_value, &exc_traceback);
-    if (__mq_close(self)) {
-        PyErr_WriteUnraisable((PyObject *)self);
-    }
-    PyErr_Restore(exc_type, exc_value, exc_traceback);
-}
+static PyType_Slot mqueue_type_slots[] = {
+    {Py_tp_doc, "MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])"},
+    {Py_tp_new, MessageQueue_tp_new},
+    {Py_tp_traverse, MessageQueue_tp_traverse},
+    {Py_tp_finalize, MessageQueue_tp_finalize},
+    {Py_tp_clear, MessageQueue_tp_clear},
+    {Py_tp_dealloc, MessageQueue_tp_dealloc},
+    {Py_tp_repr, MessageQueue_tp_repr},
+    {Py_sq_length, MessageQueue_sq_length},
+    {Py_tp_methods, MessageQueue_tp_methods},
+    {Py_tp_members, MessageQueue_tp_members},
+    {Py_tp_getset, MessageQueue_tp_getset},
+    {0, NULL}
+};
 
 
-static PyTypeObject MessageQueue_Type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "mood.mqueue.MessageQueue",
-    .tp_basicsize = sizeof(MessageQueue),
-    .tp_dealloc = (destructor)MessageQueue_tp_dealloc,
-    .tp_repr = (reprfunc)MessageQueue_tp_repr,
-    .tp_as_sequence = &MessageQueue_tp_as_sequence,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_HAVE_FINALIZE,
-    .tp_doc = "MessageQueue(name, flags[, mode=0o600, maxmsg=-1, msgsize=-1])",
-    .tp_traverse = (traverseproc)MessageQueue_tp_traverse,
-    .tp_clear = (inquiry)MessageQueue_tp_clear,
-    .tp_methods = MessageQueue_tp_methods,
-    .tp_members = MessageQueue_tp_members,
-    .tp_getset = MessageQueue_tp_getsets,
-    .tp_new = MessageQueue_tp_new,
-    .tp_finalize = (destructor)MessageQueue_tp_finalize,
+static PyType_Spec mqueue_type_spec = {
+    .name = "mood.mqueue.MessageQueue",
+    .basicsize = sizeof(MessageQueue),
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_HAVE_FINALIZE,
+    .slots = mqueue_type_slots
 };
 
 
@@ -834,66 +871,53 @@ static PyTypeObject MessageQueue_Type = {
    module
    -------------------------------------------------------------------------- */
 
+/* mqueue_def.m_slots.Py_mod_exec */
+static int
+mqueue_m_slots_exec(PyObject *module)
+{
+    module_state *state = NULL;
+    PyObject *mqueue_type = NULL;
+
+    if (
+        !(state = __PyModule_GetState__(module)) ||
+        _mqueue_get_rlimit_cur(RLIMIT_MSGQUEUE, &state->max_bytes) ||
+        _mqueue_get_limit(MQUEUE_DEFAULT_MAXMSG, &state->default_maxmsg) ||
+        _mqueue_get_limit(MQUEUE_MAX_MAXMSG, &state->max_maxmsg) ||
+        _mqueue_get_limit(MQUEUE_DEFAULT_MSGSIZE, &state->default_msgsize) ||
+        _mqueue_get_limit(MQUEUE_MAX_MSGSIZE, &state->max_msgsize) ||
+        PyModule_AddStringConstant(module, "__version__", PKG_VERSION) ||
+        !(mqueue_type = PyType_FromModuleAndSpec(module, &mqueue_type_spec, NULL)) ||
+        PyModule_AddObject(module, "MessageQueue", mqueue_type) // steals ref
+    ) {
+        Py_XDECREF(mqueue_type);
+        return -1;
+    }
+    state->min_maxmsg = 1;
+    state->min_msgsize = 1;
+    //state->min_msgsize = 8;
+    return 0;
+}
+
+
+/* mqueue_def.m_slots */
+static struct PyModuleDef_Slot mqueue_m_slots[] = {
+    {Py_mod_exec, mqueue_m_slots_exec},
+    {0, NULL}
+};
+
 /* mqueue_def */
 static PyModuleDef mqueue_def = {
     PyModuleDef_HEAD_INIT,
     .m_name = "mqueue",
     .m_doc = "Python POSIX message queues interface (Linux only)",
     .m_size = sizeof(module_state),
+    .m_slots = mqueue_m_slots,
 };
-
-
-/* get module state */
-static module_state *
-_module_get_state(void)
-{
-    return (module_state *)_PyModuleDef_GetState(&mqueue_def);
-}
-
-
-static inline int
-_module_state_init(PyObject *module)
-{
-    module_state *state = NULL;
-
-    if (
-        !(state = _PyModule_GetState(module)) ||
-        _mqueue_get_limit(MQUEUE_DEFAULT_MAXMSG, &state->default_maxmsg) ||
-        _mqueue_get_limit(MQUEUE_DEFAULT_MSGSIZE, &state->default_msgsize)
-    ) {
-        return -1;
-    }
-    state->min_maxmsg = 1;
-    state->min_msgsize = 8;
-    return 0;
-}
-
-
-static inline int
-_module_init(PyObject *module)
-{
-    if (
-        _module_state_init(module) ||
-        PyModule_AddStringConstant(module, "__version__", PKG_VERSION) ||
-        _PyModule_AddType(module, "MessageQueue", &MessageQueue_Type)
-    ) {
-        return -1;
-    }
-    return 0;
-}
 
 
 /* module initialization */
 PyMODINIT_FUNC
 PyInit_mqueue(void)
 {
-    PyObject *module = NULL;
-
-    if ((module = PyState_FindModule(&mqueue_def))) {
-        Py_INCREF(module);
-    }
-    else if ((module = PyModule_Create(&mqueue_def)) && _module_init(module)) {
-        Py_CLEAR(module);
-    }
-    return module;
+    return PyModuleDef_Init(&mqueue_def);
 }
