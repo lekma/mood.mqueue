@@ -885,9 +885,9 @@ mqueue_m_slots_exec(PyObject *module)
         _mqueue_get_limit(MQUEUE_MAX_MAXMSG, &state->max_maxmsg) ||
         _mqueue_get_limit(MQUEUE_DEFAULT_MSGSIZE, &state->default_msgsize) ||
         _mqueue_get_limit(MQUEUE_MAX_MSGSIZE, &state->max_msgsize) ||
-        PyModule_AddStringConstant(module, "__version__", PKG_VERSION) ||
         !(mqueue_type = PyType_FromModuleAndSpec(module, &mqueue_type_spec, NULL)) ||
-        PyModule_AddObject(module, "MessageQueue", mqueue_type) // steals ref
+        PyModule_AddObject(module, "MessageQueue", mqueue_type) || // steals ref
+        PyModule_AddStringConstant(module, "__version__", PKG_VERSION)
     ) {
         Py_XDECREF(mqueue_type);
         return -1;
