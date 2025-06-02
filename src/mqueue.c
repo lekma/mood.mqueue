@@ -340,6 +340,7 @@ MessageQueue_tp_traverse(MessageQueue *self, visitproc visit, void *arg)
 {
     Py_VISIT(self->callback);
     Py_VISIT(self->name);
+    Py_VISIT(Py_TYPE(self)); // heap type
     return 0;
 }
 
@@ -364,6 +365,7 @@ MessageQueue_tp_clear(MessageQueue *self)
 {
     Py_CLEAR(self->callback);
     Py_CLEAR(self->name);
+    Py_CLEAR(Py_TYPE(self)); // heap type
     return 0;
 }
 
@@ -905,6 +907,32 @@ static struct PyModuleDef_Slot mqueue_m_slots[] = {
     {0, NULL}
 };
 
+
+/* mqueue_def.m_traverse */
+static int
+mqueue_m_traverse(PyObject *module, visitproc visit, void *arg)
+{
+    //printf("mqueue_m_traverse\n");
+    return 0;
+}
+
+
+/* mqueue_def.m_clear */
+static int
+mqueue_m_clear(PyObject *module)
+{
+    //printf("mqueue_m_clear\n");
+    return 0;
+}
+
+
+/* mqueue_def.m_free */
+static void
+mqueue_m_free(PyObject *module)
+{
+    mqueue_m_clear(module);
+}
+
 /* mqueue_def */
 static PyModuleDef mqueue_def = {
     PyModuleDef_HEAD_INIT,
@@ -912,6 +940,9 @@ static PyModuleDef mqueue_def = {
     .m_doc = "Python POSIX message queues interface (Linux only)",
     .m_size = sizeof(module_state),
     .m_slots = mqueue_m_slots,
+    .m_traverse = (traverseproc)mqueue_m_traverse,
+    .m_clear = (inquiry)mqueue_m_clear,
+    .m_free = (freefunc)mqueue_m_free,
 };
 
 
