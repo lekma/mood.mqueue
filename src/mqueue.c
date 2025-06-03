@@ -365,7 +365,6 @@ MessageQueue_tp_clear(MessageQueue *self)
 {
     Py_CLEAR(self->callback);
     Py_CLEAR(self->name);
-    Py_CLEAR(Py_TYPE(self)); // heap type
     return 0;
 }
 
@@ -383,6 +382,7 @@ MessageQueue_tp_dealloc(MessageQueue *self)
         self->msg = NULL;
     }
     MessageQueue_tp_clear(self);
+    Py_XDECREF(Py_TYPE(self)); // heap type
     PyObject_GC_Del(self);
 }
 
