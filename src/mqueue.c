@@ -382,8 +382,9 @@ MessageQueue_tp_dealloc(MessageQueue *self)
         self->msg = NULL;
     }
     MessageQueue_tp_clear(self);
-    Py_XDECREF(Py_TYPE(self)); // heap type
+    PyTypeObject *type = Py_TYPE(self);
     PyObject_GC_Del(self);
+    Py_XDECREF(type); // heap type
 }
 
 
@@ -878,7 +879,6 @@ static int
 mqueue_m_slots_exec(PyObject *module)
 {
     module_state *state = NULL;
-    PyObject *mqueue_type = NULL;
 
     if (
         !(state = __PyModule_GetState__(module)) ||
@@ -887,11 +887,9 @@ mqueue_m_slots_exec(PyObject *module)
         _mqueue_get_limit(MQUEUE_MAX_MAXMSG, &state->max_maxmsg) ||
         _mqueue_get_limit(MQUEUE_DEFAULT_MSGSIZE, &state->default_msgsize) ||
         _mqueue_get_limit(MQUEUE_MAX_MSGSIZE, &state->max_msgsize) ||
-        !(mqueue_type = PyType_FromModuleAndSpec(module, &mqueue_type_spec, NULL)) ||
-        PyModule_AddObject(module, "MessageQueue", mqueue_type) || // steals ref
+        _PyModule_AddTypeFromSpec(module, &mqueue_type_spec, NULL, NULL) ||
         PyModule_AddStringConstant(module, "__version__", PKG_VERSION)
     ) {
-        Py_XDECREF(mqueue_type);
         return -1;
     }
     state->min_maxmsg = 1;
@@ -907,32 +905,6 @@ static struct PyModuleDef_Slot mqueue_m_slots[] = {
     {0, NULL}
 };
 
-
-/* mqueue_def.m_traverse */
-static int
-mqueue_m_traverse(PyObject *module, visitproc visit, void *arg)
-{
-    //printf("mqueue_m_traverse\n");
-    return 0;
-}
-
-
-/* mqueue_def.m_clear */
-static int
-mqueue_m_clear(PyObject *module)
-{
-    //printf("mqueue_m_clear\n");
-    return 0;
-}
-
-
-/* mqueue_def.m_free */
-static void
-mqueue_m_free(PyObject *module)
-{
-    mqueue_m_clear(module);
-}
-
 /* mqueue_def */
 static PyModuleDef mqueue_def = {
     PyModuleDef_HEAD_INIT,
@@ -940,9 +912,6 @@ static PyModuleDef mqueue_def = {
     .m_doc = "Python POSIX message queues interface (Linux only)",
     .m_size = sizeof(module_state),
     .m_slots = mqueue_m_slots,
-    .m_traverse = (traverseproc)mqueue_m_traverse,
-    .m_clear = (inquiry)mqueue_m_clear,
-    .m_free = (freefunc)mqueue_m_free,
 };
 
 
